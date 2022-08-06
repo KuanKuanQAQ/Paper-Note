@@ -62,7 +62,6 @@
 >
 >对比损失中分子部分可以理解为一个样本的 embedding 和它的正样本的 embedding 的相似程度，分母则是该样本和所有其他样本的 embedding 的相似程度。实际上，对比学习中的正样本只有这个样本它自己，因为代理任务是 instance discrimination。想要对比损失小，就要自己的 q 和 自己的 k 尽量相似（点积大）而和其他样本的 k 尽量不同。
 >
->在对比学习的发展过程中有三个要素被证明真正有用：projection head，尽量多的负样本，样本 embedding 一致性高。这也是 MoCo 成功的原因。
 
 **Positive Set Selection**
 
