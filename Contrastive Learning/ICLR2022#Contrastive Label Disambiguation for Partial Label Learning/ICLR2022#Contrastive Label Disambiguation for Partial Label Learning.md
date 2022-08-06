@@ -42,7 +42,7 @@
 
 **Training Objective**
 
-在这篇论文的时代，对比学习最常见的模式如下。给定一个样本 $(x,Y)$，我们通过随机数据增强产生两个新 view，query view 和 key view，分别送入 query network $g(\cdot)$ 和 key network $g'(\cdot)$，生成的结果经过  L2-normalized 得到最终的 embedding $q=g(Aug_q(x))$ 和 $k=g'(Aug_k(x))$。
+在这篇论文的时代，对比学习最常见的模式如下。给定一个样本 $(x,Y)$，我们通过随机数据增强产生两个新 view，query view 和 key view，分别送入 query network $g(\cdot)$ 和 key network $g'(\cdot)$，生成的结果经过 L2-normalized 得到最终的 embedding $q=g(Aug_q(x))$ 和 $k=g'(Aug_k(x))$。
 
 在结构上，query network 和 key network 继承分类器的卷积块，后接 prediction head（也称 projection head，大概是一个 MLP）。在参数上，key network 使用 query network 的动量更新。
 
@@ -58,10 +58,11 @@
 
 其中，$P(x)$ 是正样本集，$A(x) = \{A-\{q\}\}$ ，$q=g(Aug_q(x))$。
 
-```
-对比损失中分子部分可以理解为一个样本的 embedding 和它的正样本的 embedding 的相似程度，分母则是该样本和所有其他样本的 embedding 的相似程度。实际上，对比学习中的正样本只有这个样本它自己，因为代理任务是 instance discrimination。想要对比损失小，就要自己的 q 和 自己的 k 尽量相似（点积大）而和其他样本的 k 尽量不同。
-在对比学习的发展过程中有三个要素被证明真正有用：projection head，尽量多的负样本，样本 embedding 一致性高。这也是 MoCo 成功的原因。
-```
+>一个样本的两个 view $Aug_q(x)$ 和 $Aug_k(x)$ 之间尽量相似，和其他样本尽量不相似。
+>
+>对比损失中分子部分可以理解为一个样本的 embedding 和它的正样本的 embedding 的相似程度，分母则是该样本和所有其他样本的 embedding 的相似程度。实际上，对比学习中的正样本只有这个样本它自己，因为代理任务是 instance discrimination。想要对比损失小，就要自己的 q 和 自己的 k 尽量相似（点积大）而和其他样本的 k 尽量不同。
+>
+>在对比学习的发展过程中有三个要素被证明真正有用：projection head，尽量多的负样本，样本 embedding 一致性高。这也是 MoCo 成功的原因。
 
 **Positive Set Selection**
 
@@ -79,7 +80,7 @@
 
 ### 3.2 Prototype-based Label Disambiguation
 
-正如我们所提到的（稍后在第 5 节中从理论上证明），对比损失在嵌入空间中产生了聚类效应。 作为一种协作算法，我们介绍了我们新颖的基于原型的标签消歧策略。 重要的是，我们保留了一个原型嵌入向量 μc 对应于每个类 c ∈ {1, 2, ..., C }，它可以被视为一组代表性嵌入向量。 明确地说，伪目标分配的一个简单版本是找到当前嵌入向量的最近原型。 值得注意的是，这个原语类似于聚类步骤。 我们还通过使用移动平均样式公式来软化这个硬标签分配版本。 为此，我们可以直观地假设，原型的使用与对比项（第 3.1 节）带来的嵌入空间中的聚类效应建立了联系。 我们在第 5 节中提供了更严格的理由。
+在理想情况下，对比损失可以让各个样本的 embedding 产生聚类效应。各个聚类中心称为 prototype。在训练过程中，根据每个样本的 embedding 和各个prototype 的相似程度，决定它的 pseudo target。同时根据这个样本 的 embedding 更新最相似的类别的 prototype。
 
 **Pseudo Target Updating**
 
@@ -87,27 +88,37 @@
 
 **Prototype Updating**
 
-更新原型嵌入的最规范方法是在每次训练迭代中计算它。 然而，这会产生大量的计算量，进而导致难以忍受的训练延迟。 因此，我们以移动平均样式类似地更新类条件原型向量：
+计算聚类中心的理想方法应该是在每次迭代中对所有 embedding 重新聚类，得到新的聚类中心。但是这会产生大量的计算量。所以，作者以 EMA 的方法更新 prototype：
 
 <img src="asset/eq7.png" alt="eq7" style="zoom:50%;" />
 
-其中 c 类的动量原型 μc 由归一化查询嵌入 q 的移动平均值定义，其预测类符合 c。 γ 是一个可调的超参数。
+其中 $c$ 类的动量原型 $μ_c$ 由归一化 embedding $q$ 的移动平均值定义，其预测类符合 $c$。$γ$ 是一个超参数。
 
-### 3.3 Synergy Between Contrastive Learning and Label Disambiguation
+## 5 Why PiCO Improves Partial Label Learning？
 
-虽然看起来彼此分离，但 PiCO 的两个关键组件以协作的方式工作。 首先，由于对比项在嵌入空间中有利地表现出聚类效果，标签消歧模块通过设置更精确的原型进一步利用。 其次，一组经过完善的标签消歧结果可能反过来对作为对比学习阶段关键部分的正集构造进行回报。 当两个组件表现令人满意时，整个训练过程就会收敛。 在第 5 节中，我们进一步严格地将 PiCO 与经典的 EM 风格聚类算法相似。我们的实验，特别是第 4.3 节中显示的消融研究，进一步证明了两个组件之间协同作用的相互依赖性。 我们完整算法的伪代码如附录 C 所示。
+在本节中，我们提供了关于为什么对比原型有助于消除真实标签歧义的理论依据。 我们展示了对比学习中的对齐特性（Wang & Isola，2020）本质上最小化了嵌入空间中的类内协方差，这与经典聚类算法的目标一致。 它促使我们通过期望最大化算法来解释 PiCO。 为了看到这一点，我们考虑一个理想的设置：在每个训练步骤中，所有数据示例都是可访问的，并且增强副本也包含在训练集中，即 A = D。然后，对比损失计算为：
 
+为了方便，作者这里不使用含有 queue 的 $A$ 而是直接在整体数据集 $D$ 上计算对比损失。将 $\log \frac{exp(\cdot)}{\cdot}$ 拆开可得：
 
+<img src="asset/eq8.png" alt="eq8" style="zoom:50%;" />
 
+注意，各种 $q$ 和 $k$ 都是 L2-normalized embedding vector，也就是模为 1。所以有如下性质：
+$$
+q\cdot k = (\|q-k\|^2-2)/2
+$$
+于是 eq8 中的 (a) 项可以写作：
 
+<img src="asset/eq9.png" alt="eq9" style="zoom:50%;" />
 
+其中最后一个等式可以由 $q\cdot k$ 的性质得出。
 
+我们现在准备将 PiCO 算法解释为最大化生成模型的可能性的期望最大化算法。 在 E 步，分类器将每个数据示例分配给一个特定的集群。 在 M 步，对比损失将嵌入集中到它们的聚类平均方向，这是通过最小化方程来实现的。 (9)。 最后，训练数据将映射到单位超球面上的混合 von Mises-Fisher 分布。
 
+电磁透视。 回想一下，候选标签集是真实的噪声版本。 为了估计似然 P(Yi,xi)，我们需要建立候选者和真实标签之间的关系。 在 (Liu & Dietterich, 2012) 之后，我们做了一个温和的假设，
 
+假设 1. 候选标签集 yi 中的所有标签生成 Yi 的概率相同，但 Yi 之外的任何标签都不能生成 Yi，即 P (Yi|yi) = 􏰅(Yi) if yi ∈ Yi else 0. 这里 􏰅 (·) 是一些使其成为有效概率分布的函数。
 
-
-
-
+然后，我们证明 PiCO 隐含地模拟了如下的可能性，
 
 
 
