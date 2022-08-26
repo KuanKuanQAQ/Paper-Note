@@ -1,4 +1,4 @@
-# Debiased Contrastive Learning
+# Supervised Contrastive Learning
 
 ## Abstract
 
